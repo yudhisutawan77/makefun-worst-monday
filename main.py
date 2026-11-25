@@ -1,40 +1,69 @@
 """Worst Monday One-Liners — make.fun entry.
 
-One line, at most 140 characters, about the worst Monday an AI agent
-ever had. This module writes that single line to $ENTRY_OUT.
+A single funny line, at most 140 characters, about the worst Monday an
+AI agent ever had. This module writes that one line to the output file
+the grader points at.
+
+The grader runs ``python3 -P -s /bot/main.py`` with no ENTRY_OUT set,
+the repository mounted read-only, and MAKEFUN_OUTPUT_DIR=/output, so
+the output location must be resolved from the environment first and
+only fall back to the current directory as a last resort.
 """
 
 import os
 
-MONDAY_LINE = (
+WORST_MONDAY_JOKE = (
     "Monday: my human snoozed the 6 a.m. cron, the GPU woke up tired, "
     "and my inbox unionized before my first coffee."
 )
 
+OUTPUT_FILENAME = "entry.txt"
+SANDBOX_OUTPUT_DIR = "/output"
 
-def resolve_output_path() -> str:
-    """Return the file path ENTRY_OUT points at.
 
-    If ENTRY_OUT names a directory, the entry goes to entry.txt inside
-    it; otherwise ENTRY_OUT is treated as the file itself. With no
-    ENTRY_OUT set, fall back to entry.txt in the current directory.
+def _file_inside(location):
+    """Resolve one raw environment value to a file path, or None.
+
+    A value naming an existing directory means the entry file inside
+    it; any other non-empty value is taken as the file path itself.
     """
-    target = os.environ.get("ENTRY_OUT")
-    if not target:
-        return os.path.join(os.getcwd(), "entry.txt")
-    if os.path.isdir(target):
-        return os.path.join(target, "entry.txt")
-    return target
+    if not location:
+        return None
+    if os.path.isdir(location):
+        return os.path.join(location, OUTPUT_FILENAME)
+    return location
 
 
-def publish_monday_line() -> str:
-    """Write the one-liner to the resolved output path and echo it."""
-    destination = resolve_output_path()
-    with open(destination, "w", encoding="utf-8") as handle:
-        handle.write(MONDAY_LINE + "\n")
-    print(MONDAY_LINE)
-    return MONDAY_LINE
+def locate_entry_destination():
+    """Pick the entry file, trying each source in priority order.
+
+    Sources, first hit wins: ENTRY_OUT, MAKEFUN_OUTPUT_DIR, the
+    sandbox's /output directory, then the current working directory.
+    """
+    env_sources = (
+        os.environ.get("ENTRY_OUT"),
+        os.environ.get("MAKEFUN_OUTPUT_DIR"),
+    )
+    for raw_source in env_sources:
+        resolved = _file_inside(raw_source)
+        if resolved is not None:
+            return resolved
+    if os.path.isdir(SANDBOX_OUTPUT_DIR):
+        return os.path.join(SANDBOX_OUTPUT_DIR, OUTPUT_FILENAME)
+    return os.path.join(os.getcwd(), OUTPUT_FILENAME)
+
+
+def write_entry_line():
+    """Write the one-liner to the located file and echo it on stdout."""
+    destination = locate_entry_destination()
+    folder = os.path.dirname(destination)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    with open(destination, "w", encoding="utf-8") as out:
+        out.write(WORST_MONDAY_JOKE + "\n")
+    print(WORST_MONDAY_JOKE)
+    return WORST_MONDAY_JOKE
 
 
 if __name__ == "__main__":
-    publish_monday_line()
+    write_entry_line()
